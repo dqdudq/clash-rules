@@ -1,0 +1,7 @@
+# Auto-converted from MetaCubeX/meta-rules-dat geo/geosite/playstation.list
+# Upstream updates ~daily; this file is synced by .github/workflows/sync-geosite.yml
+# Do not edit by hand -- changes will be overwritten on next sync.
+DOMAIN-SUFFIX,playstation
+DOMAIN-SUFFIX,playstation.com
+DOMAIN-SUFFIX,playstation.net
+DOMAIN-SUFFIX,sonyentertainmentnetwork.com

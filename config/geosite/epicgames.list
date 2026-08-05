@@ -1,0 +1,32 @@
+# Auto-converted from MetaCubeX/meta-rules-dat geo/geosite/epicgames.list
+# Upstream updates ~daily; this file is synced by .github/workflows/sync-geosite.yml
+# Do not edit by hand -- changes will be overwritten on next sync.
+DOMAIN-SUFFIX,3lateral.com
+DOMAIN-SUFFIX,artstation.com
+DOMAIN-SUFFIX,capturingreality.com
+DOMAIN-SUFFIX,cubicmotion.com
+DOMAIN-SUFFIX,battlebreakers.com
+DOMAIN-SUFFIX,eac-cdn.com
+DOMAIN-SUFFIX,easy.ac
+DOMAIN-SUFFIX,easyanticheat.net
+DOMAIN-SUFFIX,epicgames.com
+DOMAIN-SUFFIX,epicgames.dev
+DOMAIN-SUFFIX,epicgamescdn.com
+DOMAIN-SUFFIX,fab.com
+DOMAIN-SUFFIX,fortnite.com
+DOMAIN-SUFFIX,hyprsense.com
+DOMAIN-SUFFIX,paragon.com
+DOMAIN-SUFFIX,playparagon.com
+DOMAIN-SUFFIX,quixel.com
+DOMAIN-SUFFIX,quixel.se
+DOMAIN-SUFFIX,radgametools.com
+DOMAIN-SUFFIX,realityscan.com
+DOMAIN-SUFFIX,roborecall.com
+DOMAIN-SUFFIX,shadowcomplex.com
+DOMAIN-SUFFIX,sketchfab.com
+DOMAIN-SUFFIX,spyjinx.com
+DOMAIN-SUFFIX,twinmotion.com
+DOMAIN-SUFFIX,unrealengine.com
+DOMAIN-SUFFIX,unrealtournament.com
+DOMAIN-SUFFIX,egdownload.fastly-edge.com
+DOMAIN-SUFFIX,fortnite-vod.akamaized.net

@@ -1,0 +1,11 @@
+# Auto-converted from MetaCubeX/meta-rules-dat geo/geosite/anthropic.list
+# Upstream updates ~daily; this file is synced by .github/workflows/sync-geosite.yml
+# Do not edit by hand -- changes will be overwritten on next sync.
+DOMAIN,servd-anthropic-website.b-cdn.net
+DOMAIN-SUFFIX,anthropic.com
+DOMAIN-SUFFIX,clau.de
+DOMAIN-SUFFIX,claude.ai
+DOMAIN-SUFFIX,claude.com
+DOMAIN-SUFFIX,claudemcpclient.com
+DOMAIN-SUFFIX,claudemcpcontent.com
+DOMAIN-SUFFIX,claudeusercontent.com
