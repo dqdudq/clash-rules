@@ -12,6 +12,7 @@ CATEGORIES = [
     "openai", "anthropic", "google", "youtube",
     "microsoft", "github", "twitter", "instagram", "facebook",
     "amazon", "apple", "steam", "nintendo", "epicgames", "playstation", "xbox",
+    "disney",
 ]
 
 SOURCE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/{}.list"
