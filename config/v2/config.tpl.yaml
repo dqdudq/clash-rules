@@ -1,0 +1,318 @@
+# =============================================================================
+# DQ Clash Rules v2  —  mihomo / OpenClash 原生 proxy-providers 版
+# -----------------------------------------------------------------------------
+# 路线 A：节点不经 subconverter 处理，AnyTLS 由 mihomo 内核原生支持（kyapi 主力协议）
+# 仓库 : https://github.com/dqdudq/clash-rules
+# 文件 : config/v2/config.tpl.yaml
+#
+# 用法 : 填好 __KYAPI_URL__ 后作为 OpenClash「自定义(Custom)配置文件」使用。
+#        OpenClash 会用自己的设置覆盖 port / dns / tun / external-controller /
+#        fake-ip 等顶层键，本文件只需维护下面四块：
+#          proxy-providers · proxy-groups · rule-providers · rules
+#
+# ⚠️ 真实订阅链接含 token，禁止提交进公开仓库。
+#    __KYAPI_URL__ 只在路由器本地替换；链接正本存 `🪪 ID Docs/` 加密笔记。
+# =============================================================================
+
+# ---- 顶层：仅「本地 mihomo 直跑」时需要；OpenClash 下会被覆盖，可保留可删 ----
+mixed-port: 7890
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090
+# dns / tun / fake-ip 交给 OpenClash 设置 + openclash_custom_overwrite.sh（OneDrive nameserver-policy 那套不受影响）
+
+# =============================================================================
+# 1. 机场订阅源  proxy-providers
+# =============================================================================
+proxy-providers:
+  kyapi:                                  # ── 主力机场（唯一）
+    type: http
+    url: "__KYAPI_URL__"
+    interval: 86400                       # 24h 重新拉订阅
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+      lazy: true
+    override:
+      additional-prefix: "[K] "          # 给 kyapi 所有节点名加前缀，分组按来源筛的基础
+      # 滤掉伪装成节点的文字提示行（剩余流量/到期日等）
+      exclude-filter: "(?i)剩余|流量|过期|到期|重置|官网|订阅|欢迎|群组|GB|Gb|gB"
+
+  # ---------------------------------------------------------------------------
+  # 备用机场：当前不启用。要加回来时——
+  #   1) 取消注释，填 __XFLTD_URL__ 等
+  #   2) 给一个不同的 additional-prefix（如 "[X] " / "[N] "）
+  #   3) 不用改分组：「*·全池」「♻️ 自动·全池」「🌍 其他地区」用了 include-all-providers，会自动纳入
+  # ---------------------------------------------------------------------------
+  # xfltd:
+  #   type: http
+  #   url: "__XFLTD_URL__"
+  #   interval: 86400
+  #   health-check: { enable: true, url: https://www.gstatic.com/generate_204, interval: 300, lazy: true }
+  #   override:
+  #     additional-prefix: "[X] "
+  #     exclude-filter: "(?i)剩余|流量|过期|到期|重置|官网"
+  # nanoport:
+  #   type: http
+  #   url: "__NANOPORT_URL__"
+  #   interval: 86400
+  #   health-check: { enable: true, url: https://www.gstatic.com/generate_204, interval: 300, lazy: true }
+  #   override:
+  #     additional-prefix: "[N] "
+
+# =============================================================================
+# 2. 代理组  proxy-groups
+#    结构：业务组 → 地区一级(主力/全池) → 地区二级 → 自动 → 功能
+#    “只选主力的日本” = 地区一级默认指向「日本·主力」(只含 kyapi)，全池是备胎
+# =============================================================================
+proxy-groups:
+
+  # ========================= 主入口 =========================
+  - name: 🚀 手动切换
+    type: select
+    proxies:
+      - ♻️ 自动·主力
+      - ♻️ 自动·全池
+      - 🇯🇵 日本
+      - 🇺🇸 美国
+      - 🇭🇰 香港
+      - 🇸🇬 新加坡
+      - 🇨🇳 台湾
+      - 🇰🇷 韩国
+      - 🌍 其他地区
+      - DIRECT
+
+  # ===================== 地区一级（面向使用，默认=主力）=====================
+  # 想让 kyapi 那档挂了自动降级到全池：把 type 改成 fallback 即可（成员顺序已排好）
+  - { name: 🇯🇵 日本,    type: select, proxies: [🇯🇵 日本·主力,   🇯🇵 日本·全池] }
+  - { name: 🇺🇸 美国,    type: select, proxies: [🇺🇸 美国·主力,   🇺🇸 美国·全池] }
+  - { name: 🇭🇰 香港,    type: select, proxies: [🇭🇰 香港·主力,   🇭🇰 香港·全池] }
+  - { name: 🇸🇬 新加坡,  type: select, proxies: [🇸🇬 新加坡·主力, 🇸🇬 新加坡·全池] }
+  - { name: 🇨🇳 台湾,    type: select, proxies: [🇨🇳 台湾·主力,   🇨🇳 台湾·全池] }
+  - { name: 🇰🇷 韩国,    type: select, proxies: [🇰🇷 韩国·主力,   🇰🇷 韩国·全池] }
+
+  # ===================== 地区二级 · 主力（只含 kyapi）=====================
+  # url-test：在筛出的节点里自动挑延迟最低的
+  - name: 🇯🇵 日本·主力
+    type: url-test
+    use: [kyapi]
+    filter: "(?i)日本|jp|japan"
+    # ↓ 若确认 kyapi 的 N 档是慢线路(1~4.5s)，取消注释即可把 N 档排除在“主力”外
+    #   实际正则要按真实节点名调（见 v2/README「待确认①」）
+    # exclude-filter: "(?i)日本 ?N|JP ?N| N\\d"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇺🇸 美国·主力
+    type: url-test
+    use: [kyapi]
+    filter: "(?i)美国|us|united ?states|america"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇭🇰 香港·主力
+    type: url-test
+    use: [kyapi]
+    filter: "(?i)香港|港|hk|hong ?kong"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇸🇬 新加坡·主力
+    type: url-test
+    use: [kyapi]
+    filter: "(?i)新加坡|狮城|獅城|sg|singapore"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇨🇳 台湾·主力
+    type: url-test
+    use: [kyapi]
+    filter: "(?i)台湾|臺灣|台|tw|taiwan"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇰🇷 韩国·主力
+    type: url-test
+    use: [kyapi]
+    filter: "(?i)韩国|韓國|首尔|kr|korea|seoul"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+
+  # ===================== 地区二级 · 全池（所有机场，含未来备用）=====================
+  - name: 🇯🇵 日本·全池
+    type: url-test
+    include-all-providers: true
+    filter: "(?i)日本|jp|japan"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇺🇸 美国·全池
+    type: url-test
+    include-all-providers: true
+    filter: "(?i)美国|us|united ?states|america"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇭🇰 香港·全池
+    type: url-test
+    include-all-providers: true
+    filter: "(?i)香港|港|hk|hong ?kong"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇸🇬 新加坡·全池
+    type: url-test
+    include-all-providers: true
+    filter: "(?i)新加坡|狮城|獅城|sg|singapore"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇨🇳 台湾·全池
+    type: url-test
+    include-all-providers: true
+    filter: "(?i)台湾|臺灣|台|tw|taiwan"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: 🇰🇷 韩国·全池
+    type: url-test
+    include-all-providers: true
+    filter: "(?i)韩国|韓國|首尔|kr|korea|seoul"
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+
+  # ========================= 自动 =========================
+  - name: ♻️ 自动·主力
+    type: url-test
+    use: [kyapi]
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+  - name: ♻️ 自动·全池
+    type: url-test
+    include-all-providers: true
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+
+  # ========================= 其他地区 =========================
+  # mihomo 正则是 RE2，不支持 (?!...) 否定预查——只用关键词并列写法
+  - name: 🌍 其他地区
+    type: select
+    include-all-providers: true
+    filter: "(?i)英国|UK|United ?Kingdom|德国|Germany|法国|France|荷兰|Netherlands|加拿大|Canada|土耳其|Turkey|印度|India|印尼|Indonesia|越南|Vietnam|泰国|Thailand|马来|Malaysia|菲律宾|Philippines|巴西|Brazil|俄罗斯|Russia|乌克兰|Ukraine|阿根廷|Argentina"
+
+  # ========================= 业务/服务 =========================
+  # 排列：先业务、点进去直接铺平地区一级，不用二级跳转
+  - name: 📹 油管
+    type: select
+    proxies: [🚀 手动切换, 🇯🇵 日本, 🇺🇸 美国, 🇭🇰 香港, 🇸🇬 新加坡, 🇨🇳 台湾, 🇰🇷 韩国, 🌍 其他地区, ♻️ 自动·主力, DIRECT]
+  - name: 🏰 迪士尼
+    type: select
+    proxies: [🚀 手动切换, 🇯🇵 日本, 🇺🇸 美国, 🇸🇬 新加坡, 🇭🇰 香港, 🇨🇳 台湾, 🌍 其他地区, ♻️ 自动·主力]
+  - name: 🤖 AI服务
+    type: select
+    proxies: [🚀 手动切换, 🇺🇸 美国, 🇯🇵 日本, 🇸🇬 新加坡, 🇭🇰 香港, 🇨🇳 台湾, 🌍 其他地区, ♻️ 自动·主力]
+  - name: 🏢 Office全家桶
+    type: select
+    proxies: [🎯 全球直连, 🚀 手动切换, 🇯🇵 日本, 🇺🇸 美国, 🇭🇰 香港, ♻️ 自动·主力, DIRECT]
+  - name: 🐙 GitHub
+    type: select
+    proxies: [🚀 手动切换, 🇺🇸 美国, 🇯🇵 日本, 🇸🇬 新加坡, 🇭🇰 香港, ♻️ 自动·主力, DIRECT]
+  - name: 📱 社交媒体
+    type: select
+    proxies: [🚀 手动切换, 🇯🇵 日本, 🇺🇸 美国, 🇸🇬 新加坡, 🇭🇰 香港, 🇨🇳 台湾, 🌍 其他地区, ♻️ 自动·主力]
+  - name: 🛒 亚马逊
+    type: select
+    proxies: [🚀 手动切换, 🇺🇸 美国, 🇯🇵 日本, DIRECT]
+  - name: 🍎 苹果服务
+    type: select
+    proxies: [DIRECT, 🚀 手动切换, 🇺🇸 美国, 🇯🇵 日本]
+  - name: 🎮 游戏平台
+    type: select
+    proxies: [DIRECT, 🚀 手动切换, 🇯🇵 日本, 🇺🇸 美国, 🇸🇬 新加坡]
+
+  # ========================= 功能 =========================
+  - name: 🎯 全球直连
+    type: select
+    proxies: [DIRECT, 🚀 手动切换]
+  - name: 🛑 广告拦截
+    type: select
+    proxies: [REJECT, DIRECT]
+  - name: 🐟 漏网之鱼
+    type: select
+    proxies: [🚀 手动切换, ♻️ 自动·主力, 🎯 全球直连, DIRECT]
+
+# =============================================================================
+# 3. 规则集  rule-providers
+#    ACL4SSR（局域网/去广告/中国域名/GFW兜底）+ 本仓库自建 geosite（每天自动同步）
+#    behavior 一律 classical（自建 list 是 DOMAIN,/DOMAIN-SUFFIX, 前缀格式）
+# =============================================================================
+rule-providers:
+  # ---- ACL4SSR 上游 ----
+  lan:          { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/LocalAreaNetwork.list",  path: ./ruleset/acl4ssr/lan.list }
+  unban:        { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/UnBan.list",             path: ./ruleset/acl4ssr/unban.list }
+  banad:        { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanAD.list",             path: ./ruleset/acl4ssr/banad.list }
+  banprogramad: { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/BanProgramAD.list",      path: ./ruleset/acl4ssr/banprogramad.list }
+  cndomain:     { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaDomain.list",       path: ./ruleset/acl4ssr/cndomain.list }
+  cncompanyip:  { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaCompanyIp.list",    path: ./ruleset/acl4ssr/cncompanyip.list }
+  proxymedia:   { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyMedia.list",        path: ./ruleset/acl4ssr/proxymedia.list }
+  proxygfw:     { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ProxyGFWlist.list",      path: ./ruleset/acl4ssr/proxygfw.list }
+
+  # ---- 本仓库自建 geosite（config/geosite/*.list，GitHub Actions 每天 02:30 北京时间同步）----
+  youtube:     { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/youtube.list",     path: ./ruleset/dq/youtube.list }
+  disney:      { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/disney.list",      path: ./ruleset/dq/disney.list }
+  google:      { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/google.list",      path: ./ruleset/dq/google.list }
+  anthropic:   { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/anthropic.list",   path: ./ruleset/dq/anthropic.list }
+  openai:      { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/openai.list",      path: ./ruleset/dq/openai.list }
+  microsoft:   { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/microsoft.list",   path: ./ruleset/dq/microsoft.list }
+  github:      { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/github.list",      path: ./ruleset/dq/github.list }
+  twitter:     { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/twitter.list",     path: ./ruleset/dq/twitter.list }
+  instagram:   { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/instagram.list",   path: ./ruleset/dq/instagram.list }
+  facebook:    { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/facebook.list",    path: ./ruleset/dq/facebook.list }
+  amazon:      { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/amazon.list",      path: ./ruleset/dq/amazon.list }
+  apple:       { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/apple.list",       path: ./ruleset/dq/apple.list }
+  steam:       { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/steam.list",       path: ./ruleset/dq/steam.list }
+  nintendo:    { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/nintendo.list",    path: ./ruleset/dq/nintendo.list }
+  epicgames:   { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/epicgames.list",   path: ./ruleset/dq/epicgames.list }
+  playstation: { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/playstation.list", path: ./ruleset/dq/playstation.list }
+  xbox:        { type: http, behavior: classical, format: text, interval: 86400, url: "https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/geosite/xbox.list",        path: ./ruleset/dq/xbox.list }
+
+# =============================================================================
+# 4. 规则  rules   （从上往下匹配，命中即停）
+# =============================================================================
+rules:
+  - RULE-SET,lan,🎯 全球直连
+  - RULE-SET,unban,🎯 全球直连
+  - RULE-SET,banad,🛑 广告拦截
+  - RULE-SET,banprogramad,🛑 广告拦截
+
+  - RULE-SET,youtube,📹 油管
+  - RULE-SET,disney,🏰 迪士尼
+  - RULE-SET,google,🤖 AI服务
+  - RULE-SET,anthropic,🤖 AI服务
+  - RULE-SET,openai,🤖 AI服务
+  - RULE-SET,microsoft,🏢 Office全家桶
+  - RULE-SET,github,🐙 GitHub
+  - RULE-SET,twitter,📱 社交媒体
+  - RULE-SET,instagram,📱 社交媒体
+  - RULE-SET,facebook,📱 社交媒体
+  - RULE-SET,amazon,🛒 亚马逊
+  - RULE-SET,apple,🍎 苹果服务
+  - RULE-SET,steam,🎮 游戏平台
+  - RULE-SET,nintendo,🎮 游戏平台
+  - RULE-SET,epicgames,🎮 游戏平台
+  - RULE-SET,playstation,🎮 游戏平台
+  - RULE-SET,xbox,🎮 游戏平台
+
+  - RULE-SET,proxymedia,🚀 手动切换
+  - RULE-SET,proxygfw,🚀 手动切换
+
+  - RULE-SET,cndomain,🎯 全球直连
+  - RULE-SET,cncompanyip,🎯 全球直连
+  - GEOIP,CN,🎯 全球直连,no-resolve
+
+  - MATCH,🐟 漏网之鱼
