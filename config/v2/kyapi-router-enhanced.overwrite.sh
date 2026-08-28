@@ -9,10 +9,10 @@
 # 基于 kyapi 官方订阅规则，不改它的 rules/业务组结构，只：
 #   1) 加 6 个地区组： 🇯🇵日本  🇺🇸美国  🇸🇬新加坡  🇭🇰香港  🇹🇼台湾  🌍其他国家
 #      （url-test 自动选最快；地区组默认排除 " N-" 中转慢线，其余照 kyapi 原名）
-#   2) 加 4 个专属分组： 📺油管  🏰迪士尼  🎵声破天  🛒亚马逊
-#   3) 把这 10 个组塞进 kyapi 每个业务组候选项最前面
-#   4) 把 kyapi 里 youtube / disney / spotify / amazon 的分流
-#      从「🌍 国外媒体」改指到各自的专属分组
+#   2) 加 3 个专属分组： 📺油管  🏰迪士尼  🛒亚马逊
+#   3) 把这些组塞进 kyapi 每个业务组候选项最前面
+#   4) 把 kyapi 里 youtube / disney / amazon 的分流从「🌍 国外媒体」改指到各专属分组
+#   5) 删掉 🎵声破天(其规则回「国外媒体」) 和 kyapi 自带的 📢谷歌FCM(其规则改走「节点选择」)
 #
 # kyapi 节点档位：E=不优化直连线(text: "E组为不优化")  S=优化线  N=中转慢线
 # 幂等：OpenClash 每次刷新订阅重跑本段，脚本自身去重。
@@ -53,7 +53,7 @@ others = real.reject { |n| claimed.include?(n) }
 groups << ut.call("🌍 其他国家", others) unless others.empty?
 
 region_names = groups.map { |g| g["name"] }          # 6 个国家组
-SVC = ["📺 油管", "🏰 迪士尼", "🎵 声破天", "🛒 亚马逊"]
+SVC = ["📺 油管", "🏰 迪士尼", "🛒 亚马逊"]
 
 # 每个选择器的候选顺序：🚀节点选择 / ♻️自动选择 → 服务组 → 国家组
 SVC.each do |s|
@@ -66,9 +66,22 @@ c["proxy-groups"] ||= []
 have = c["proxy-groups"].map { |g| g["name"] }
 c["proxy-groups"].concat(groups.reject { |g| have.include?(g["name"]) })   # 缺哪个补哪个，顺序稍后统一排
 
+# --- 删组 + 回收其规则（幂等）---
+DROP = { "🎵 声破天" => "🌍 国外媒体", "📢 谷歌FCM" => "🚀 节点选择" }
+c["proxy-groups"].reject! { |g| DROP.key?(g["name"]) }
+c["proxy-groups"].each do |g|
+  next unless g["proxies"]
+  g["proxies"] = g["proxies"].map { |p| DROP[p] || p }.uniq
+end
+c["rules"] = (c["rules"] || []).map do |r|
+  s = r.to_s
+  DROP.each { |k, v| s = s.gsub(k, v) }
+  s
+end
+
 # --- 重排各选择器候选项（清掉平铺节点，只留分组入口）---
 all_new    = region_names + SVC
-BIZ_CLEAN  = ["🌍 国外媒体", "📲 电报信息", "💬 OpenAi", "💎 Gemini", "💡 Claude", "📢 谷歌FCM", "🐟 漏网之鱼"]
+BIZ_CLEAN  = ["🌍 国外媒体", "📲 电报信息", "💬 OpenAi", "💎 Gemini", "💡 Claude", "🐟 漏网之鱼"]
 KEEP_DIRECT = ["Ⓜ️ 微软服务", "🍎 苹果服务"]   # 这两个保留「🎯 全球直连」在最前（默认直连不变）
 c["proxy-groups"].each do |g|
   name = g["name"]
@@ -104,14 +117,12 @@ c["proxy-groups"] = c["proxy-groups"].each_with_index
 # --- 规则重定向：只动当前指向「国外媒体」的那批 ---
 YT  = /youtube|googlevideo|ytimg|youtu\.be|yt3\.ggpht|withyoutube|youtubei|youtubekids|youtubeeducation|youtubegaming/i
 DIS = /disney|disneyplus|disney-plus|disneystreaming|bamgrid|dssott|starott|bn5x\.net|registerdisney/i
-SPO = /spotify|spotifycdn|scdn\.co|pscdn\.co|spoti\.fi/i
 AMZ = /amazonvideo|primevideo|atv-ps\.amazon|aiv-cdn|aiv-delivery|pv-cdn|media-amazon|images-amazon|aboutamazon|amazon\.jobs|amazontools|amazontours|amazonuniversity/i
 c["rules"] = (c["rules"] || []).map do |r|
   s = r.to_s
   next r unless s.include?("国外媒体")
   d = if    s =~ YT  then "📺 油管"
       elsif s =~ DIS then "🏰 迪士尼"
-      elsif s =~ SPO then "🎵 声破天"
       elsif s =~ AMZ then "🛒 亚马逊"
       end
   d ? s.sub(/,[^,]*国外媒体.*\z/, ",#{d}") : r
@@ -123,7 +134,6 @@ EXTRA = [
   "DOMAIN-SUFFIX,amazon.co.jp,🛒 亚马逊",
   "DOMAIN-SUFFIX,primevideo.com,🛒 亚马逊",
   "DOMAIN-SUFFIX,media-amazon.com,🛒 亚马逊",
-  "DOMAIN-SUFFIX,open.spotify.com,🎵 声破天",
 ]
 seen = c["rules"].map(&:to_s)
 EXTRA.reverse_each do |e|
@@ -133,4 +143,4 @@ end
 File.write(cf, c.to_yaml)
 ' "$CONFIG_FILE"
 
-LOG_TIP "kyapi enhanced: region + youtube/disney/spotify/amazon groups injected."
+LOG_TIP "kyapi enhanced: region + youtube/disney/amazon groups; dropped spotify & FCM."
