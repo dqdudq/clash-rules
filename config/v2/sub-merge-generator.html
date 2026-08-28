@@ -1,0 +1,305 @@
+<title>订阅合并链接生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --bg:#f4f6f5; --surface:#ffffff; --surface-2:#eef2f1;
+  --ink:#182525; --muted:#5b6b69; --faint:#8a9997;
+  --line:#dbe3e1; --line-strong:#c4d0cd;
+  --accent:#0f766e; --accent-ink:#ffffff; --accent-soft:#d5e8e5;
+  --ok:#15803d; --warn:#b45309; --danger:#b3261e;
+  --shadow:0 1px 2px rgba(20,40,38,.05),0 12px 32px -12px rgba(20,40,38,.14);
+  --radius:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1413; --surface:#141d1c; --surface-2:#1b2726;
+    --ink:#e7edeb; --muted:#9baca8; --faint:#71827f;
+    --line:#26332f; --line-strong:#33433f;
+    --accent:#2dd4bf; --accent-ink:#06201d; --accent-soft:#1e3a37;
+    --ok:#4ade80; --warn:#fbbf24; --danger:#f87171;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1413; --surface:#141d1c; --surface-2:#1b2726;
+  --ink:#e7edeb; --muted:#9baca8; --faint:#71827f;
+  --line:#26332f; --line-strong:#33433f;
+  --accent:#2dd4bf; --accent-ink:#06201d; --accent-soft:#1e3a37;
+  --ok:#4ade80; --warn:#fbbf24; --danger:#f87171;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.55);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px; margin:0 auto; padding:32px 22px 60px}
+code{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.9em}
+
+header.page{margin-bottom:24px}
+.kicker{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:500;}
+h1{font-size:25px; font-weight:600; margin:.35rem 0 .5rem; letter-spacing:-.01em; text-wrap:balance}
+.sub{color:var(--muted); max-width:66ch; margin:0}
+
+.grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; align-items:start; margin-top:22px}
+@media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+.card-h{padding:13px 17px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:10px; justify-content:space-between}
+.card-h h2{font-size:14px; font-weight:600; margin:0}
+.card-h .hint{font-size:11.5px; color:var(--faint); font-family:"IBM Plex Mono",monospace}
+.card-body{padding:17px}
+
+.field{margin-bottom:17px}
+.field:last-child{margin-bottom:0}
+.lab{display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase;
+  letter-spacing:.08em; margin-bottom:8px}
+.help{font-size:12px; color:var(--faint); margin:6px 0 0}
+
+input[type=text], select{
+  width:100%; font:inherit; color:var(--ink); background:var(--surface-2);
+  border:1px solid var(--line-strong); border-radius:8px; padding:9px 11px;
+}
+input[type=text]{font-family:"IBM Plex Mono",monospace; font-size:13px}
+input[type=text]:focus, select:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); background:var(--surface)}
+
+.airport{border:1px solid var(--line); border-radius:9px; padding:11px; margin-bottom:9px; background:var(--surface-2)}
+.airport-row{display:grid; grid-template-columns:130px 1fr auto; gap:8px; align-items:center}
+@media (max-width:520px){.airport-row{grid-template-columns:1fr}}
+.airport .url-row{margin-top:8px}
+.btn-x{background:transparent; border:none; color:var(--faint); font-size:17px; line-height:1; padding:4px 7px; border-radius:6px; cursor:pointer}
+.btn-x:hover{color:var(--danger); background:var(--accent-soft)}
+.btn-add{width:100%; background:transparent; border:1px dashed var(--line-strong); color:var(--muted); padding:9px; font-size:13px; border-radius:8px; cursor:pointer; margin-top:2px}
+.btn-add:hover{border-color:var(--accent); color:var(--accent)}
+
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+@media (max-width:520px){.row2{grid-template-columns:1fr}}
+.checks{display:flex; flex-wrap:wrap; gap:14px}
+.toggle{display:inline-flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer}
+.toggle input{accent-color:var(--accent); width:16px; height:16px}
+
+.btn-primary{background:var(--accent); color:var(--accent-ink); border:1px solid var(--accent); border-radius:8px;
+  padding:11px 20px; font:inherit; font-weight:600; font-size:14px; cursor:pointer; margin-top:19px}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-primary:active{transform:translateY(1px)}
+.btn-ghost{background:transparent; border:1px solid var(--line-strong); color:var(--muted); border-radius:8px;
+  padding:7px 12px; font:inherit; font-size:12.5px; cursor:pointer; margin-left:12px}
+.btn-ghost:hover{color:var(--ink); border-color:var(--accent)}
+
+.out-head{display:flex; align-items:center; gap:10px; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line)}
+.out-head b{font-size:13px}
+.btn-copy{background:var(--surface-2); border:1px solid var(--line-strong); color:var(--ink); border-radius:8px;
+  padding:7px 15px; font:inherit; font-size:13px; font-weight:600; cursor:pointer}
+.btn-copy:hover{border-color:var(--accent); color:var(--accent)}
+.btn-copy.done{background:var(--ok); color:#fff; border-color:var(--ok)}
+
+.linkbox{margin:0; padding:15px; overflow-x:auto; font-family:"IBM Plex Mono",monospace; font-size:12px;
+  line-height:1.65; color:var(--ink); white-space:pre-wrap; word-break:break-all; background:var(--surface)}
+.linkbox.empty{color:var(--faint); font-style:italic; white-space:normal}
+.params{padding:0 15px 15px; font-size:12px; color:var(--muted)}
+.params table{border-collapse:collapse; width:100%; font-family:"IBM Plex Mono",monospace; font-size:11.5px}
+.params td{padding:3px 8px 3px 0; vertical-align:top; border-bottom:1px solid var(--line)}
+.params td:first-child{color:var(--faint); white-space:nowrap; width:1%}
+
+.howto{margin-top:18px}
+.howto .lab{margin-bottom:9px}
+.howto ol{margin:0; padding-left:19px; color:var(--muted); font-size:13px; line-height:1.7}
+.howto ol code{background:var(--surface-2); padding:1px 5px; border-radius:4px; color:var(--ink)}
+.note{margin-top:13px; padding:10px 12px; border-left:3px solid var(--warn);
+  background:color-mix(in srgb,var(--warn) 9%, transparent); border-radius:0 6px 6px 0; font-size:12.5px}
+:root:not([data-theme]) .note, .note{background:var(--surface-2)}
+@supports (background:color-mix(in srgb,red,red)){.note{background:color-mix(in srgb,var(--warn) 9%, transparent)}}
+
+.foot{margin-top:36px; font-size:12px; color:var(--faint); text-align:center; font-family:"IBM Plex Mono",monospace}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div class="kicker">subconverter · multi-airport · one link</div>
+    <h1>订阅合并链接生成器</h1>
+    <p class="sub">粘几个机场订阅链接，选规则模板，生成一条 <code>sub.dqhub.uk</code> 合并订阅链接。粘进 OpenClash / Clash Verge 的订阅框即可，节点、分组、分流规则一次到位。全程本地运算，链接不外发。</p>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-h"><h2>输入</h2><span class="hint">本地运算 · 不联网</span></div>
+      <div class="card-body">
+
+        <div class="field">
+          <span class="lab">机场订阅</span>
+          <div id="airports"></div>
+          <button class="btn-add" id="addAirport" type="button">+ 添加机场</button>
+          <p class="help">名字只用于你自己辨认，不进链接。多个机场按顺序合并；subconverter 无法按机场分优先级，「地区优选」靠节点名里的 E-/S- 档前缀筛。</p>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <span class="lab">规则模板</span>
+            <select id="tpl">
+              <option value="dqv2">DQ v2 · 地区优选/全选 + kyapi 式业务组</option>
+              <option value="acl4ssr">ACL4SSR 官方精简</option>
+              <option value="none">不套规则（仅节点，自己配）</option>
+            </select>
+          </div>
+          <div class="field">
+            <span class="lab">目标格式</span>
+            <select id="target">
+              <option value="clash">Clash / mihomo（OpenClash·Verge）</option>
+              <option value="singbox">sing-box</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="lab">过滤掉的假节点关键词</span>
+          <input type="text" id="exclude" spellcheck="false">
+          <p class="help">机场常把「剩余流量 / 到期日 / 官网」塞成假节点。命中这里任一关键词的节点会被丢弃。</p>
+        </div>
+
+        <div class="field">
+          <span class="lab">选项</span>
+          <div class="checks">
+            <label class="toggle"><input type="checkbox" id="udp" checked> 开启 UDP</label>
+            <label class="toggle"><input type="checkbox" id="scv" checked> 跳过证书校验</label>
+            <label class="toggle"><input type="checkbox" id="emoji" checked> 节点名 emoji</label>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="gen" type="button">生成链接</button>
+        <button class="btn-ghost" id="clear" type="button">清除输入</button>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <div class="out-head"><b>合并订阅链接</b><button class="btn-copy" id="copy" type="button">复制</button></div>
+        <p class="linkbox empty" id="out">填机场链接，点「生成链接」。</p>
+        <div class="params" id="params"></div>
+      </div>
+
+      <div class="howto card" style="padding:16px 18px">
+        <span class="lab">怎么用</span>
+        <ol>
+          <li>复制上面的链接</li>
+          <li>OpenClash → 配置订阅 → 新增，地址粘进去；或 Clash Verge → 订阅 → 新建</li>
+          <li>更新订阅 → 选中生成的配置 → 应用</li>
+          <li>之后换机场链接：回本页改 → 重新生成 → 覆盖那条订阅地址即可</li>
+        </ol>
+        <div class="note" id="note">链接里带各机场 token，等同订阅链接本身。别公开发、别贴进公开仓库。</div>
+      </div>
+    </section>
+  </div>
+
+  <p class="foot">private tool · nothing leaves your browser</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var LS="dq_submerge_link_v1";
+  var BASE="https://sub.dqhub.uk/sub";
+  var TPL={
+    dqv2:"https://raw.githubusercontent.com/dqdudq/clash-rules/main/config/DQ_v2.ini",
+    acl4ssr:"https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Mini.ini",
+    none:""
+  };
+  var DEFAULT={
+    airports:[{name:"kyapi",url:""},{name:"",url:""}],
+    tpl:"dqv2", target:"clash",
+    exclude:"剩余,流量,官网,过期,到期,重置,订阅,群组,回家,公告,不优化,试用,拉取,GB,倍率",
+    udp:true, scv:true, emoji:true
+  };
+  var state=load();
+  function load(){ try{var v=JSON.parse(localStorage.getItem(LS)); if(v&&v.airports) return v;}catch(e){} return JSON.parse(JSON.stringify(DEFAULT)); }
+  function save(){ try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){} }
+  var $=function(s){return document.querySelector(s);};
+
+  function renderAirports(){
+    var box=$("#airports"); box.innerHTML="";
+    state.airports.forEach(function(a,i){
+      var w=document.createElement("div"); w.className="airport";
+      var r=document.createElement("div"); r.className="airport-row";
+      var nm=document.createElement("input"); nm.type="text"; nm.placeholder="机场名"; nm.value=a.name||"";
+      nm.setAttribute("aria-label","机场名"); nm.oninput=function(){a.name=nm.value; save();};
+      var sp=document.createElement("span"); sp.style.cssText="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint)"; sp.textContent="#"+(i+1);
+      var del=document.createElement("button"); del.className="btn-x"; del.type="button"; del.innerHTML="&times;";
+      del.setAttribute("aria-label","删除"); del.onclick=function(){ state.airports.splice(i,1); if(!state.airports.length) state.airports.push({name:"",url:""}); save(); renderAirports(); };
+      r.appendChild(nm); r.appendChild(sp); r.appendChild(del);
+      var ur=document.createElement("div"); ur.className="url-row";
+      var u=document.createElement("input"); u.type="text"; u.placeholder="https://…/subscribe?token=…"; u.value=a.url||"";
+      u.setAttribute("aria-label","订阅链接"); u.oninput=function(){a.url=u.value; save();};
+      ur.appendChild(u);
+      w.appendChild(r); w.appendChild(ur); box.appendChild(w);
+    });
+  }
+
+  function syncOptions(){
+    $("#tpl").value=state.tpl; $("#target").value=state.target; $("#exclude").value=state.exclude;
+    $("#udp").checked=state.udp; $("#scv").checked=state.scv; $("#emoji").checked=state.emoji;
+  }
+
+  function build(){
+    var links=state.airports.map(function(a){return (a.url||"").trim();}).filter(Boolean);
+    if(!links.length) return {err:"至少填一个机场订阅链接。"};
+    var url=links.join("|");
+    var excl=state.exclude.split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean).join("|");
+    var p=[];
+    p.push(["target", state.target]);
+    p.push(["url", url]);
+    if(TPL[state.tpl]) p.push(["config", TPL[state.tpl]]);
+    p.push(["emoji", state.emoji?"true":"false"]);
+    p.push(["list","false"]);
+    p.push(["udp", state.udp?"true":"false"]);
+    p.push(["scv", state.scv?"true":"false"]);
+    p.push(["tfo","false"]);
+    if(excl) p.push(["exclude", excl]);
+    p.push(["filename","dq-merged"]);
+    var qs=p.map(function(kv){ return kv[0]+"="+encodeURIComponent(kv[1]); }).join("&");
+    return {link:BASE+"?"+qs, params:p, count:links.length};
+  }
+
+  function generate(){
+    var r=build(), out=$("#out"), pm=$("#params");
+    if(r.err){ out.className="linkbox empty"; out.textContent="⚠ "+r.err; pm.innerHTML=""; window._link=""; return; }
+    window._link=r.link;
+    out.className="linkbox"; out.textContent=r.link;
+    var rows=r.params.map(function(kv){
+      var v=kv[1]; if(kv[0]==="url") v=v.split("|").map(function(x){return x.replace(/(token=|token%3D)[^&|]+/i,"$1…");}).join("  |  ");
+      if(kv[0]==="config") v=v.replace(/^https:\/\/raw\.githubusercontent\.com\/dqdudq\/clash-rules\/main\//,"…/");
+      return "<tr><td>"+kv[0]+"</td><td>"+esc(v)+"</td></tr>";
+    }).join("");
+    pm.innerHTML="<table>"+rows+"</table>";
+  }
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+  $("#addAirport").onclick=function(){ state.airports.push({name:"",url:""}); save(); renderAirports(); };
+  $("#gen").onclick=generate;
+  ["tpl","target"].forEach(function(id){ $("#"+id).onchange=function(){ state[id]=this.value; save(); }; });
+  ["udp","scv","emoji"].forEach(function(id){ $("#"+id).onchange=function(){ state[id]=this.checked; save(); }; });
+  $("#exclude").oninput=function(){ state.exclude=this.value; save(); };
+  $("#clear").onclick=function(){
+    if(!confirm("清除全部机场链接和设置？只影响本浏览器保存的草稿。")) return;
+    state=JSON.parse(JSON.stringify(DEFAULT)); save(); renderAirports(); syncOptions();
+    $("#out").className="linkbox empty"; $("#out").textContent="填机场链接，点「生成链接」。";
+    $("#params").innerHTML=""; window._link="";
+  };
+  $("#copy").onclick=function(){
+    var b=this; if(!window._link){ generate(); if(!window._link) return; }
+    var done=function(){ b.classList.add("done"); b.textContent="已复制"; setTimeout(function(){b.classList.remove("done"); b.textContent="复制";},1600); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(window._link).then(done,fb); } else fb();
+    function fb(){ var t=document.createElement("textarea"); t.value=window._link; t.style.position="fixed"; t.style.opacity="0";
+      document.body.appendChild(t); t.select(); try{document.execCommand("copy"); done();}catch(e){alert("复制失败，请手动选中");} document.body.removeChild(t); }
+  };
+
+  renderAirports(); syncOptions();
+})();
+</script>
