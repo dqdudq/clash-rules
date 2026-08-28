@@ -1,73 +1,61 @@
-# DQ Clash Rules v2 — 设计说明
+# DQ Clash Rules v2 — 两套并行
 
-> 状态：**设计稿，未落地**。文件 `config/v2/config.tpl.yaml`。
 > 目标客户端：家用软路由 iStoreOS 上的 **OpenClash（mihomo 内核）**。
-> 主力机场：**kyapi**（`acsub.kyapi.xyz`），68 个 AnyTLS 节点。
+> 主力机场：**kyapi**（`acsub.kyapi.xyz`），节点全 AnyTLS。
+> 核心诉求：业务分组里能直接选「日本 / 美国…」，且默认只用**优质线**（E/S 档），不掉进 N 中转慢线。
+
+kyapi 节点命名 `<旗> <E|S|N>-<国家><序号>`（例 `🇯🇵 E-日本1` / `🇯🇵 N-日本15`）。
+实测：E/S 档 380~520ms；**N 档 800~3600ms**（中转慢线）。所以 `优选 = E/S`，`全选 = 全部`。
 
 ---
 
-## 1. 为什么推倒重来（v1 的三个毛病）
+## 模式一：本地覆写（kyapi 单跑，已部署）
 
-| v1 现象 | 根因 |
-|---|---|
-| 选「日本节点」经常连到某个小机场的日本线，不是主力机场的 | v1 把所有机场的日本节点丢进一个 `url-test` 池，谁快选谁，无来源概念 |
-| kyapi 的 AnyTLS 节点一走订阅转换就全没了 | subconverter 的 Clash 序列化器不支持 AnyTLS，`target=clash` 整体返回 0 节点（xfltd 已踩过，见 `project_subconverter_service`） |
-| 分组结构是照 ACL4SSR 改的，不完全贴合习惯 | v1 是在官方模板上做增删，没有从「先挑服务、再挑主力/备用节点」的用法出发重排 |
+**文件**：`openclash-region-groups.overwrite.sh`
+**落地**：其中 `ruby -ryaml …` 整段已追加进路由器 `/etc/openclash/custom/openclash_custom_overwrite.sh`
+（备份 `openclash_custom_overwrite.sh.bak.20260828`）。OpenClash 每次刷新订阅后自动重跑，幂等。
 
-## 2. v2 的核心思路：主力 / 全池 两层节点组
+**做的事**：不动 kyapi 自带的 2520 条规则和业务分组，只：
+1. 按生成配置里的真实节点名，动态建地区组：`日本优选`/`日本全选`/`美国优选`… （JP/US/SG/HK/TW/KR，生成配置里有哪个国家就建哪个）
+2. 把这些组插进 `🚀 节点选择 / 国外媒体 / 电报 / OpenAi / Gemini / Claude / 微软 / 苹果 / 谷歌FCM / 漏网之鱼` 每个组候选项的最前面
 
-```
-业务组 (📹油管 / 🤖AI服务 / …)
-   └─ 地区一级 (🇯🇵 日本)                  ← select，默认指向「主力」
-        ├─ 🇯🇵 日本·主力   url-test, use:[kyapi]              ← 只有主力机场的日本节点
-        └─ 🇯🇵 日本·全池   url-test, include-all-providers    ← 所有机场（含以后加的备用）的日本节点
-```
+`优选` = url-test，排除名字含 ` N-|中转|Relay|回国` 的；`全选` = 该地区全部。
 
-- **「只选主力的日本」** = 地区一级 `🇯🇵 日本` 默认成员就是 `🇯🇵 日本·主力`，只从 kyapi 里挑。
-- **备用不是摆设**：地区一级第二个成员是 `·全池`，手动点一下就切过去；想自动降级把 `🇯🇵 日本` 的 `type: select` 改成 `fallback`（成员顺序已经排好，主力全灭才用全池）。
-- **来源靠前缀区分**：每个 `proxy-provider` 用 `override.additional-prefix` 给节点名加 `[K] ` / `[X] ` …。`·主力` 组用 `use: [kyapi]` 精确锁定；`·全池` 组用 `include-all-providers: true`，以后加机场不用改分组。
+**验证**：路由器上 `cp` 一份配置跑脚本 + `/etc/openclash/clash -t` → `test is successful`，连跑两次分组数不变。
+**生效**：cron `0 3 * * *` 自动重建配置时套用；要立刻生效在 LuCI 点「应用配置」。
 
-## 3. 为什么走「路线 A：mihomo 原生 proxy-providers」而不是 subconverter
+**注意**：路由器 OpenClash 的 kyapi 订阅带 `keyword` 过滤，只保留 美/新/日 三国；想要港/台/韩地区组，得先在订阅管理器里放宽那个 keyword 过滤。
 
-- **AnyTLS 天然可用**：节点从 kyapi 订阅直接进 mihomo，不经过有 bug 的 Clash 转换器。
-- **不必暴露公网**：整份配置就是 OpenClash 的本地配置文件，`sub.dqhub.uk` / SubHub 前端这次用不上（它们仍可留给别的场景）。
-- **来源标签 / 按机场筛**是 mihomo `proxy-providers` + `filter` 的原生能力，subconverter 侧要靠 `rename` 硬凑且分不清来源。
-- 代价：OpenClash 要切成「自定义配置文件」模式，不再用它自带的订阅管理器拉 kyapi（订阅 URL 移到配置文件里的 `proxy-providers.kyapi.url`）。
+---
 
-## 4. 分组清单（v2）
+## 模式二：网页合并链接（多机场，subconverter）
 
-**业务/服务**：📹 油管 · 🏰 迪士尼 · 🤖 AI服务 · 🏢 Office全家桶 · 🐙 GitHub · 📱 社交媒体 · 🛒 亚马逊 · 🍎 苹果服务 · 🎮 游戏平台
-（沿用 v1 的 9 个；`🍎 苹果` / `🎮 游戏` 默认第一项是 DIRECT）
+**页面**：私有 Artifact「订阅合并链接生成器」
+→ https://claude.ai/code/artifact/e20de72e-cec5-4acd-baa7-4426f81301ec
+（纯前端，不联网，机场链接只存浏览器 localStorage）
 
-**节点**：🚀 手动切换（主入口）· 🇯🇵🇺🇸🇭🇰🇸🇬🇨🇳🇰🇷 地区一级 · 各地区 `·主力` / `·全池` · ♻️ 自动·主力 / ♻️ 自动·全池 · 🌍 其他地区
+**产出**：一条 `https://sub.dqhub.uk/sub?target=clash&url=<机场1|机场2|…>&config=<DQ_v2.ini>&exclude=<假节点关键词>` 合并订阅链接，粘进 OpenClash / Clash Verge 订阅框即用。
 
-**功能**：🎯 全球直连 · 🛑 广告拦截（默认 REJECT）· 🐟 漏网之鱼
+**规则模板**：`config/DQ_v2.ini`（顶层 `config/` 而非 `config/v2/`——raw.githubusercontent 对新建子目录有几分钟传播延迟，放老目录才能立即被 subconverter 拉到）。
+地区组同样拆 `优选`（正则 `(?i)E-日本|S-日本`，靠 E-/S- 前缀筛）/ `全选`；业务组沿用 kyapi 命名。
+纯 subconverter **无法按来源机场分优先级**，「主力优先」只有模式一能做。
 
-**规则**：ACL4SSR（局域网 / 去广告 / 中国域名 / GFW 兜底）+ 本仓库自建 `config/geosite/*.list`（每天自动同步）。全部走 mihomo `rule-providers`（`behavior: classical`）。
+**已验证**：`target=clash` + kyapi 链接 + `config=DQ_v2.ini` → 200 / ~750KB / 68 节点 / 26 组 / 14394 条规则；`日本优选` 8 个（E1-4,S5-8）、`日本全选` 13 个。
 
-## 5. 待你确认（落地前需要定的点）
+**踩坑**：
+- `sub.dqhub.uk` 的 subconverter（现为 `v0.9.1-*-mihomo backend`）**已能正常序列化 AnyTLS 到 clash 格式**，2026-08-11 记录的「AnyTLS→target=clash 清零」bug 不再复现。
+- `target=clash.meta` 在这个 build 上报 `Invalid target!`，只能用 `target=clash`。
+- ACL4SSR **没有** `Clash/Telegram.list`，加了会 404 → subconverter worker 卡死。Telegram 规则已改内联（域名 + 官方 IP 段）。
 
-1. **kyapi 节点的 E/S/N 档命名**——2026-08-27 实测记录里 N 档延迟 1~4.5s（慢）。要不要在 `🇯🇵 日本·主力` 等组里用 `exclude-filter` 把 N 档排除？需要一份真实 `proxies:` 节点名清单才能写准正则（模板里先留了注释行）。给我在路由器上 dump 一下 kyapi 的节点名即可。
-2. **地区一级用 `select` 还是 `fallback`**——`select` = 纯手动、默认主力；`fallback` = 主力全灭自动切全池。模板默认 `select`。
-3. **业务分组是否再精简**——比如 社交媒体/油管/迪士尼 是否合并成一个「🎬 国际媒体」。当前保持 9 个不动。
-4. **备用机场**——现在只 kyapi。xfltd / nanoPort 要不要现在就作为 `·全池` 的备用池加进来（各给一个前缀）？还是等真需要时再加。
-5. **OpenClash 接入方式**——确认可以把 OpenClash 从「订阅管理器 + `config_path=xfltd.yaml`」切成「自定义配置文件 = 本 yaml」。切换前会单独确认（改共享生产配置，按 `feedback_minimal_blast_radius_shared_infra`）。
+---
 
-## 6. 已知风险 / 注意
+## 其他文件
 
-- **ACL4SSR 某些 list 含 `URL-REGEX` 等 mihomo `classical` 不认的行**，内核可能报 rule-set 解析错误。真出现就把对应源换成 ACL4SSR 的精简/`_No_Resolve` 版本，或剔掉该条。
-- **`additional-prefix` 会改节点名**，所有 `filter` 都按「关键词出现在名字任意位置」写，不加 `^$` 锚定，不用 `(?!...)`（mihomo 是 RE2，不支持预查——这点跟 v1 里 subconverter `std::regex` 卡死是两码事，但结论一致：别用预查）。
-- **真实订阅 URL 含 token，不能进公开仓库**。`config.tpl.yaml` 里是 `__KYAPI_URL__` 占位符；正本放 `🪪 ID Docs/` 加密笔记，只在路由器本地替换进实际配置。
-- v1 的 `config/DQ_ACL4SSR.ini` **保留不动**，作为回退。
-
-## 7. 落地步骤（等你拍板后再做）
-
-1. 路由器上把 `__KYAPI_URL__` 换成真实 kyapi 链接，存成 `/etc/openclash/config/dq-v2.yaml`
-2. 先用隔离 mihomo 实例（端口 17890/19090，按 `✅ Playbooks/2026-08-11_安全测试机场节点质量`）`mihomo -t` 校验 + 起一份实测分组生成、节点筛选是否符合预期，**全程不碰生产 `config_path`**
-3. 验证通过后，OpenClash 切「自定义配置文件」→ 选 `dq-v2.yaml` → 重载
-4. 观察 1~2 天稳定后，清理 OpenClash 订阅管理器里 kyapi 那条重复订阅
+- `config.tpl.yaml` — mihomo 原生 `proxy-providers` 完整配置模板。适合「多机场 + 主力优先 + 不想依赖 subconverter」的场景：每机场一个 provider 带 `additional-prefix`，`优选` 用 `filter: ^\[主\]…` 锁主力。当前未采用（模式一够用），留作备选。
+- `DQ_v2.ini` (本目录副本，与顶层 `config/DQ_v2.ini` 同步) — 便于集中查看。
 
 ## 相关
 
-`../../✅ Playbooks/2026-08-05_DQ自定义订阅规则模板搭建与维护手册.md`（v1 手册）·
-`Claude Code Memory/project_subconverter_service.md` · `project_kyapi_airport_evaluation.md`
+`../../✅ Playbooks/2026-08-05_DQ自定义订阅规则模板搭建与维护手册.md` ·
+`Claude Code Memory/project_subconverter_service.md` · `project_kyapi_airport_evaluation.md` ·
+`Claude Code Memory/reference_router.md`
