@@ -64,9 +64,7 @@ end
 
 c["proxy-groups"] ||= []
 have = c["proxy-groups"].map { |g| g["name"] }
-newg = groups.reject { |g| have.include?(g["name"]) }
-pos = c["proxy-groups"].index { |g| !["🚀 节点选择", "♻️ 自动选择"].include?(g["name"]) } || c["proxy-groups"].size
-c["proxy-groups"].insert(pos, *newg)
+c["proxy-groups"].concat(groups.reject { |g| have.include?(g["name"]) })   # 缺哪个补哪个，顺序稍后统一排
 
 # --- 重排各选择器候选项（清掉平铺节点，只留分组入口）---
 all_new    = region_names + SVC
@@ -88,6 +86,20 @@ c["proxy-groups"].each do |g|
     g["proxies"] = ["🎯 全球直连", "🚀 节点选择", "♻️ 自动选择"] + SVC + region_names
   end
 end
+
+# --- 面板卡片顺序：节点选择/自动选择 → 服务组 → kyapi业务组 → 国家组 → 功能组 ---
+HEAD = ["🚀 节点选择", "♻️ 自动选择"]
+TAIL = ["🎯 全球直连", "🛑 全球拦截", "🐟 漏网之鱼", "GLOBAL"]
+rank = lambda do |n|
+  return 0   + HEAD.index(n)        if HEAD.include?(n)
+  return 100 + SVC.index(n)         if SVC.include?(n)
+  return 800 + region_names.index(n) if region_names.include?(n)
+  return 900 + TAIL.index(n)        if TAIL.include?(n)
+  500   # kyapi 自带业务组等，保持原相对顺序
+end
+c["proxy-groups"] = c["proxy-groups"].each_with_index
+                     .sort_by { |g, i| [rank.call(g["name"]), i] }
+                     .map(&:first)
 
 # --- 规则重定向：只动当前指向「国外媒体」的那批 ---
 YT  = /youtube|googlevideo|ytimg|youtu\.be|yt3\.ggpht|withyoutube|youtubei|youtubekids|youtubeeducation|youtubegaming/i
