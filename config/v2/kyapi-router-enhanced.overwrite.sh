@@ -52,14 +52,15 @@ end
 others = real.reject { |n| claimed.include?(n) }
 groups << ut.call("🌍 其他国家", others) unless others.empty?
 
-region_names = groups.map { |g| g["name"] }
+region_names = groups.map { |g| g["name"] }          # 6 个国家组
 SVC = ["📺 油管", "🏰 迪士尼", "🎵 声破天", "🛒 亚马逊"]
+
+# 每个选择器的候选顺序：🚀节点选择 / ♻️自动选择 → 服务组 → 国家组
 SVC.each do |s|
-  opts = ["🚀 节点选择"] + region_names + ["♻️ 自动选择"]
+  opts = ["🚀 节点选择", "♻️ 自动选择"] + region_names
   opts << "DIRECT" if s == "🛒 亚马逊"
   groups << { "name" => s, "type" => "select", "proxies" => opts }
 end
-inject = region_names + SVC
 
 c["proxy-groups"] ||= []
 have = c["proxy-groups"].map { |g| g["name"] }
@@ -67,18 +68,25 @@ newg = groups.reject { |g| have.include?(g["name"]) }
 pos = c["proxy-groups"].index { |g| !["🚀 节点选择", "♻️ 自动选择"].include?(g["name"]) } || c["proxy-groups"].size
 c["proxy-groups"].insert(pos, *newg)
 
-BIZ  = /节点选择|国外媒体|电报信息|OpenAi|Gemini|Claude|微软服务|苹果服务|谷歌FCM|漏网之鱼/
-LEAD = ["🚀 节点选择", "♻️ 自动选择", "🎯 全球直连", "DIRECT", "REJECT"]
+# --- 重排各选择器候选项（清掉平铺节点，只留分组入口）---
+all_new    = region_names + SVC
+BIZ_CLEAN  = ["🌍 国外媒体", "📲 电报信息", "💬 OpenAi", "💎 Gemini", "💡 Claude", "📢 谷歌FCM", "🐟 漏网之鱼"]
+KEEP_DIRECT = ["Ⓜ️ 微软服务", "🍎 苹果服务"]   # 这两个保留「🎯 全球直连」在最前（默认直连不变）
 c["proxy-groups"].each do |g|
-  next unless g["name"] =~ BIZ
-  next if SVC.include?(g["name"])
-  g["proxies"] ||= []
-  g["proxies"].reject! { |p| inject.include?(p) }
-  h = 0
-  h += 1 while g["proxies"][h] && LEAD.include?(g["proxies"][h])
-  # 🚀 节点选择 只塞地区组；4 个服务组本身引用了 🚀 节点选择，塞进去会成环
-  add_here = (g["name"] == "🚀 节点选择") ? region_names : inject
-  g["proxies"].insert(h, *add_here)
+  name = g["name"]
+  if name == "🚀 节点选择"
+    # 手动选具体节点的入口：保留原始节点列表，国家组塞在 自动选择/DIRECT 之后、节点之前
+    raw = (g["proxies"] || []).reject { |p| all_new.include?(p) || ["♻️ 自动选择", "DIRECT"].include?(p) }
+    g["proxies"] = ["♻️ 自动选择", "DIRECT"] + region_names + raw
+  elsif SVC.include?(name)
+    # 服务组：🚀节点选择/♻️自动选择 → 国家组（+ 亚马逊 DIRECT）；不列平铺节点、不互相引用
+    g["proxies"] = ["🚀 节点选择", "♻️ 自动选择"] + region_names + (name == "🛒 亚马逊" ? ["DIRECT"] : [])
+  elsif BIZ_CLEAN.include?(name)
+    tail = (name == "🐟 漏网之鱼") ? ["DIRECT"] : []
+    g["proxies"] = ["🚀 节点选择", "♻️ 自动选择"] + SVC + region_names + tail
+  elsif KEEP_DIRECT.include?(name)
+    g["proxies"] = ["🎯 全球直连", "🚀 节点选择", "♻️ 自动选择"] + SVC + region_names
+  end
 end
 
 # --- 规则重定向：只动当前指向「国外媒体」的那批 ---
