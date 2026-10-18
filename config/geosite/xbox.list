@@ -1,8 +1,8 @@
 # Auto-converted from MetaCubeX/meta-rules-dat geo/geosite/xbox.list
 # Upstream updates ~daily; this file is synced by .github/workflows/sync-geosite.yml
 # Do not edit by hand -- changes will be overwritten on next sync.
-DOMAIN,prodforza.blob.core.windows.net
 DOMAIN,flightsimulator.azureedge.net
+DOMAIN,prodforza.blob.core.windows.net
 DOMAIN-SUFFIX,xbox
 DOMAIN-SUFFIX,gamepass.com
 DOMAIN-SUFFIX,orithegame.com
@@ -27,6 +27,14 @@ DOMAIN-SUFFIX,xboxplayanywhere.com
 DOMAIN-SUFFIX,xboxservices.com
 DOMAIN-SUFFIX,xboxstudios.com
 DOMAIN-SUFFIX,xbx.lv
+DOMAIN-SUFFIX,asobostudio.com
+DOMAIN-SUFFIX,flightsimulator.com
+DOMAIN-SUFFIX,beth.games
+DOMAIN-SUFFIX,bethesda.net
+DOMAIN-SUFFIX,bethesdagamestudios.com
+DOMAIN-SUFFIX,bethsoft.com
+DOMAIN-SUFFIX,doom.com
+DOMAIN-SUFFIX,elderscrolls.com
 DOMAIN-SUFFIX,forza.net
 DOMAIN-SUFFIX,forzamotorsport.net
 DOMAIN-SUFFIX,forzaracingchampionship.com
@@ -37,12 +45,4 @@ DOMAIN-SUFFIX,minecraft.net
 DOMAIN-SUFFIX,minecraftservices.com
 DOMAIN-SUFFIX,minecraftshop.com
 DOMAIN-SUFFIX,mojang.com
-DOMAIN-SUFFIX,asobostudio.com
-DOMAIN-SUFFIX,flightsimulator.com
-DOMAIN-SUFFIX,beth.games
-DOMAIN-SUFFIX,bethesda.net
-DOMAIN-SUFFIX,bethesdagamestudios.com
-DOMAIN-SUFFIX,bethsoft.com
-DOMAIN-SUFFIX,doom.com
-DOMAIN-SUFFIX,elderscrolls.com
 DOMAIN-SUFFIX,xboxlive.cn
